@@ -1,49 +1,90 @@
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'startBulkRemoval') {
+    startProcessing();
+    sendResponse({ status: 'started' });
+  }
+});
+
 chrome.storage.local.get('urlsToRemove', (data) => {
-  const urls = data.urlsToRemove || [];
-  if (urls.length === 0) return;
+  if (data.urlsToRemove && data.urlsToRemove.length > 0) {
+    startProcessing();
+  }
+});
 
-  let i = 0;
+function startProcessing() {
+  chrome.storage.local.get('urlsToRemove', (data) => {
+    const urls = data.urlsToRemove || [];
+    
+    console.log('=== Bulk Removal Started ===');
+    console.log(`Total URLs: ${urls.length}`);
+    
+    if (urls.length === 0) return;
 
-  function processNext() {
-    if (i >= urls.length) {
-      alert('All URLs processed! Done 🎉');
-      chrome.storage.local.remove('urlsToRemove');
-      return;
-    }
+    let currentIndex = 0;
 
-    // Find "New request" button
-    let newBtn = document.querySelector('button[aria-label="New request" i]') ||
-                 Array.from(document.querySelectorAll('button')).find(b => 
-                   b.textContent.trim().includes('New request'));
+    function processNext() {
+      if (currentIndex >= urls.length) {
+        console.log('=== ALL DONE! ===');
+        alert(`All ${urls.length} URLs submitted! Check Temporary Removals list.`);
+        chrome.storage.local.remove('urlsToRemove');
+        return;
+      }
 
-    if (newBtn) newBtn.click();
+      console.log(`\n--- Processing URL ${currentIndex + 1}/${urls.length}: ${urls[currentIndex]} ---`);
 
-    setTimeout(() => {
-      // URL input field
-      let input = document.querySelector('input[placeholder="Enter URL" i]') ||
-                  document.querySelector('input[type="text"]');
-
-      // Submit button
-      let submit = Array.from(document.querySelectorAll('button')).find(b => 
-        b.textContent.toLowerCase().includes('submit') ||
-        b.textContent.includes('request')
+      // Open Temporary removals tab
+      const tempTab = Array.from(document.querySelectorAll('*')).find(el => 
+        (el.textContent || '').toLowerCase().includes('temporary removals') && el.offsetParent !== null
       );
 
-      if (input && submit) {
-        input.focus();
-        input.value = urls[i];
-        input.dispatchEvent(new Event('input', {bubbles: true}));
-        
-        setTimeout(() => {
-          submit.click();
-          i++;
-          setTimeout(processNext, 4000); // Wait 4 seconds before next URL
-        }, 1000);
-      } else {
-        alert('Buttons not found! Refresh the page or let me know to update selectors.');
-      }
-    }, 2000);
-  }
+      if (tempTab) tempTab.click();
 
-  processNext();
-});
+      setTimeout(() => {
+        const newBtn = Array.from(document.querySelectorAll('button')).find(el => 
+          (el.textContent || '').toLowerCase().includes('new request')
+        );
+
+        if (newBtn) {
+          console.log('Clicking New Request');
+          newBtn.click();
+
+          setTimeout(() => {
+            const input = document.querySelector('input[placeholder="Enter URL"]') ||
+                          document.querySelector('input[placeholder*="Enter URL" i]');
+
+            const nextBtn = Array.from(document.querySelectorAll('button')).find(el => 
+              (el.textContent || '').toLowerCase().includes('next')
+            );
+
+            if (input && nextBtn) {
+              input.value = urls[currentIndex].trim();
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+
+              setTimeout(() => {
+                nextBtn.click();
+
+                setTimeout(() => {
+                  const confirmBtn = Array.from(document.querySelectorAll('button')).find(el => 
+                    (el.textContent || '').toLowerCase().includes('submit request') ||
+                    (el.textContent || '').toLowerCase().includes('submit')
+                  );
+
+                  if (confirmBtn) confirmBtn.click();
+
+                  currentIndex++;
+                  setTimeout(processNext, 15000);  // Longer delay for full reset
+                }, 6000);
+              }, 3000);
+            } else {
+              setTimeout(processNext, 5000);
+            }
+          }, 8000);
+        } else {
+          setTimeout(processNext, 6000);
+        }
+      }, 5000);
+    }
+
+    processNext();
+  });
+}
