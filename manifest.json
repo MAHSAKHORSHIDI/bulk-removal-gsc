@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Bulk Removal GSC",
+  "version": "1.0",
+  "description": "حذف دسته‌جمعی URL در سرچ کنسول",
+  "permissions": ["storage", "activeTab"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://search.google.com/search-console/removals*"],
+      "js": ["content.js"]
+    }
+  ]
+}
